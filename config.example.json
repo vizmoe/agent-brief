@@ -1,0 +1,7 @@
+{
+  "language": "zh-CN",
+  "fishAudio": {
+    "apiKey": "$FISH_API_KEY",
+    "referenceId": "$FISH_REFERENCE_ID"
+  }
+}
