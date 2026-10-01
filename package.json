@@ -16,7 +16,8 @@
   "scripts": {
     "test": "node --experimental-strip-types --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "audit": "node --experimental-strip-types scripts/audit.ts"
   },
   "keywords": [
     "pi-package",
