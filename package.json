@@ -1,0 +1,61 @@
+{
+  "name": "pi-brief",
+  "version": "0.3.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Lightweight root-agent lifecycle notifications for Pi using Fish Audio and Bark.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vizmoe/pi-brief.git"
+  },
+  "homepage": "https://github.com/vizmoe/pi-brief#readme",
+  "bugs": {
+    "url": "https://github.com/vizmoe/pi-brief/issues"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test",
+    "audit": "node --experimental-strip-types scripts/audit.ts"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "fish-audio",
+    "bark"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "files": [
+    "index.ts",
+    "backends.ts",
+    "config.ts",
+    "detection.ts",
+    "diagnostics.ts",
+    "host.ts",
+    "policy.ts",
+    "runtime.ts",
+    "secrets.ts",
+    "summary.ts",
+    "types.ts",
+    "util.ts",
+    "config.example.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.99.1",
+    "@types/node": "24.12.4",
+    "typescript": "5.9.3"
+  }
+}
