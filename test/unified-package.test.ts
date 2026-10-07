@@ -41,6 +41,11 @@ test("both native entrypoints ship with their shared core in one standalone arti
     assert.equal(await realpath(paths.pluginRoot), await realpath(packed));
     assert.equal(paths.config, join(directory, "fixture.json"));
     assert.equal(result.stderr.replace(/\(node:\d+\) ExperimentalWarning:[\s\S]*/, ""), "");
+    const help = await exec(process.execPath, [join(packed, "scripts/codex-brief.mts"), "--help"]);
+    assert.doesNotMatch(help.stdout, /--signal|user-presence/);
+    for (const path of ["README.md", "docs/codex.md", "skills/codex-brief/SKILL.md", ".codex-plugin/plugin.json"]) {
+      assert.doesNotMatch(await readFile(join(packed, path), "utf8"), /--signal|user-presence|hardware-key|硬件密钥/i, path);
+    }
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 

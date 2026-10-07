@@ -6,15 +6,10 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
-  buildUserPresenceJobForTest,
-  exerciseFailedDeliveryClaimForTest,
   isQuietTime,
   isRootHookEvent,
   jobIsCurrentForTest,
   processHookEvent,
-  userPresenceSummaryForTest,
-  USER_PRESENCE_FAILURE_MESSAGE,
-  USER_PRESENCE_SPEECH,
 } from "../../adapters/codex/runtime.mts";
 import {
   extractChangedFiles,
@@ -105,72 +100,6 @@ test("root detection fails closed for every child-agent shape", () => {
     }),
     false,
   );
-});
-
-test("user-presence signal builds a synchronous fixed worker job", () => {
-  const now = 1_750_000_000_000;
-  const first = buildUserPresenceJobForTest(now, "thread-1");
-  const duplicate = buildUserPresenceJobForTest(now + 500, "thread-1");
-  assert.equal(first.kind, "user-presence");
-  assert.equal(first.sessionId, "thread-1");
-  assert.equal(first.turnId, "signal-user-presence");
-  assert.equal(first.createdAt, now);
-  assert.equal(first.dueAt, now);
-  assert.equal(first.pendingAction, USER_PRESENCE_SPEECH);
-  assert.equal(first.eventId, duplicate.eventId);
-  assert.equal(first.token, duplicate.token);
-  assert.deepEqual(userPresenceSummaryForTest(), {
-    event: "user-presence",
-    text: "Codex 即将使用硬件密钥，请准备触摸确认",
-    actionRequired: true,
-  });
-});
-
-test("unknown signal fails before reading hook stdin", () => {
-  const result = spawnSync(
-    process.execPath,
-    [runtimePath, "--signal", "hardware-touch"],
-    {
-      encoding: "utf8",
-      timeout: 5_000,
-    },
-  );
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /--signal user-presence/);
-});
-
-test("failed user-presence delivery releases its claim for an immediate retry", async () => {
-  await withState("codex-brief-user-presence-retry", async () => {
-    const basePayload = {
-      event: "user-presence" as const,
-      text: USER_PRESENCE_SPEECH,
-      sessionId: "thread-1",
-      turnId: "turn-1",
-      token: "signal-token",
-      kind: "user-presence" as const,
-      createdAt: Date.now(),
-    };
-    assert.deepEqual(
-      await exerciseFailedDeliveryClaimForTest(
-        { ...basePayload, eventId: "user-presence-event" },
-        "fishaudio",
-      ),
-      { firstClaimed: true, retryClaimed: true },
-    );
-    assert.deepEqual(
-      await exerciseFailedDeliveryClaimForTest(
-        {
-          ...basePayload,
-          event: "idle",
-          eventId: "idle-event",
-          kind: "stop",
-        },
-        "fishaudio",
-      ),
-      { firstClaimed: true, retryClaimed: false },
-    );
-    assert.match(USER_PRESENCE_FAILURE_MESSAGE, /outside the Codex sandbox/);
-  });
 });
 
 test("successful patch evidence extracts changed paths without absolute home paths", () => {

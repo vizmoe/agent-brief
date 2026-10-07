@@ -1,6 +1,6 @@
 # Agent Brief for Codex
 
-The Codex entrypoint retains native lifecycle hooks, background delivery, concise task summaries and the explicit hardware-key reminder. Install it from the [root guide](../README.md#install). Codex hook installation requires the user's trust review; installation alone does not activate untrusted hooks.
+The Codex entrypoint provides native lifecycle hooks, background delivery and concise task summaries. Install it from the [root guide](../README.md#install). Codex hook installation requires the user's trust review; installation alone does not activate untrusted hooks.
 
 ## Configuration
 
@@ -15,7 +15,7 @@ Use the [shared schema](../README.md#configure) in `~/.codex/codex-brief/config.
 }
 ```
 
-Fish Audio and Bark can be enabled separately. The native Fish model default remains in [the Codex configuration adapter](../adapters/codex/config.mts); specify `fishAudio.model` to override it. Bark uses the shared `/push` batch endpoint and verifies every device result. `language` controls recap and notification language. `notify.quietHours` suppresses ordinary completion; questions, permissions, errors, and the explicit hardware-key signal remain eligible.
+Fish Audio and Bark can be enabled separately. The native Fish model default remains in [the Codex configuration adapter](../adapters/codex/config.mts); specify `fishAudio.model` to override it. Bark uses the shared `/push` batch endpoint and verifies every device result. `language` controls recap and notification language. `notify.quietHours` suppresses ordinary completion; questions, permissions and errors remain eligible.
 
 Codex's credential commands run from the user's home directory, through the user's shell, with stdin closed. Values must resolve to one nonempty line. Each channel resolves its fields sequentially and stops after a failure. Commands, stdout, stderr and credentials are excluded from evidence and error logs. Command exit, cancellation, and timeout clean up the process group. Command limits live in [the adapter policy](../adapters/codex/config.mts).
 
@@ -29,7 +29,7 @@ Commands must work without interactive login. For secret-manager CLIs that autom
 
 | Event | Native behavior |
 | --- | --- |
-| `SessionStart` | Reset notification state and refresh the explicit-signal entrypoint pointer |
+| `SessionStart` | Reset notification state and cancel stale work |
 | `UserPromptSubmit` | Start a new turn and cancel stale work |
 | `PreToolUse` / `PostToolUse` | Record evidence; new activity cancels old notifications |
 | `PermissionRequest` | Record a candidate; subsequent evidence must show authorization is still needed |
@@ -40,7 +40,7 @@ Child agents and the summary observer stay quiet. Short tasks and empty acknowle
 
 State uses `PLUGIN_DATA` when provided; direct commands fall back to the user's Codex Brief data directory. Logs remain at `~/.codex/codex-brief/brief.log`. Configuration and credentials never go into the plugin cache. Fish audio uses the shared bounded transport and private temporary files, while Codex's process-wide lock serializes native playback. New host activity cancels delivery and stops stale audio.
 
-## Diagnostics and explicit signal
+## Diagnostics
 
 From the installed plugin root:
 
@@ -49,9 +49,8 @@ node scripts/codex-brief.mts --paths
 node scripts/codex-brief.mts --check
 node scripts/codex-brief.mts --check-summary
 node scripts/codex-brief.mts --test
-node scripts/codex-brief.mts --signal user-presence
 ```
 
-`--paths` is read-only. `--check` resolves the Fish API key and checks the service without playing audio. `--check-summary` calls the configured summary model without retrieving Fish credentials. `--test` plays a short voice test. The signal synchronously announces “Codex 即将使用硬件密钥，请准备触摸确认” and reports failure when it cannot play; it is an explicit reminder, not a Git-signing prerequisite. Networked diagnostics consume normal service quota.
+`--paths` is read-only. `--check` resolves the Fish API key and checks the service without playing audio. `--check-summary` calls the configured summary model without retrieving Fish credentials. `--test` plays a short voice test. Networked diagnostics consume normal service quota.
 
 After installing or updating, open a new Codex chat to load the current hooks and skill. The native `codex-brief` skill is preserved for configuration and diagnosis.

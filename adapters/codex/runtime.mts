@@ -38,7 +38,6 @@ import type {
   HookEvent,
   WorkerJob,
   WorkerKind,
-  SignalName,
   DeliveryBackend,
   TurnMeta,
   EvidenceRecord,
@@ -70,10 +69,6 @@ const MAX_CHANGED_FILES = 12;
 const MAX_IDLE_AGE_MS = 90_000;
 const MAX_IMPORTANT_AGE_MS = 300_000;
 const EVENT_DEDUPE_WINDOW_MS = 2_000;
-export const USER_PRESENCE_SPEECH = "Codex 即将使用硬件密钥，请准备触摸确认";
-export const USER_PRESENCE_FAILURE_MESSAGE =
-  "codex_brief: user-presence notification failed; run the signal outside " +
-  "the Codex sandbox and check credential commands, network, and audio access.";
 
 function stateRoot(): string {
   return (
@@ -84,34 +79,6 @@ function stateRoot(): string {
 
 function logPath(): string {
   return process.env.CODEX_BRIEF_LOG_PATH || join(userDirectory(), "brief.log");
-}
-
-function buildUserPresenceJob(
-  now = Date.now(),
-  sessionId = process.env.CODEX_THREAD_ID?.trim() || "manual-user-presence",
-): WorkerJob {
-  const eventId = sha256(
-    `signal:user-presence:${sessionId}:${Math.floor(
-      now / EVENT_DEDUPE_WINDOW_MS,
-    )}`,
-  );
-  return {
-    kind: "user-presence",
-    eventId,
-    sessionId,
-    turnId: "signal-user-presence",
-    token: `signal-${eventId.slice(0, 32)}`,
-    createdAt: now,
-    dueAt: now,
-    pendingAction: USER_PRESENCE_SPEECH,
-  };
-}
-
-export function buildUserPresenceJobForTest(
-  now: number,
-  sessionId: string,
-): WorkerJob {
-  return buildUserPresenceJob(now, sessionId);
 }
 
 function sessionDirectory(sessionId: string): string {
@@ -325,7 +292,6 @@ async function cancelInterventions(sessionId: string): Promise<void> {
   await Promise.all([
     writePointer(sessionId, "permission", `cancel-${randomUUID()}`),
     writePointer(sessionId, "question", `cancel-${randomUUID()}`),
-    writePointer(sessionId, "user-presence", `cancel-${randomUUID()}`),
   ]);
 }
 
@@ -430,12 +396,6 @@ export async function processHookEvent(
       writePointer(sessionId, "root", `cancel-${randomUUID()}`),
       cancelInterventions(sessionId),
     ]);
-    if (eventName === "SessionStart" && process.env.PLUGIN_ROOT) {
-      await atomicWriteJson(join(userDirectory(), "runtime.json"), {
-        entrypoint: SCRIPT_PATH,
-        dataDirectory: process.env.PLUGIN_DATA,
-      });
-    }
     return [];
   }
 
@@ -594,7 +554,7 @@ export function isQuietTime(date: Date, quietHours?: { start: string; end: strin
 }
 
 function allowedByQuietHours(event: NotificationEvent, config: NotifyConfig, now = new Date()): boolean {
-  return event === "user-presence" || isNotificationAllowedNow(event, config.notifyPolicy.quietHours, now);
+  return isNotificationAllowedNow(event, config.notifyPolicy.quietHours, now);
 }
 
 function maxAgeFor(event: NotificationEvent, config: NotifyConfig): number {
@@ -607,8 +567,13 @@ function pointerNameForJob(job: WorkerJob): WorkerKind | "root" {
   return job.kind === "stop" ? "root" : job.kind;
 }
 
+function isWorkerKind(kind: unknown): kind is WorkerKind {
+  return kind === "stop" || kind === "permission" || kind === "question";
+}
+
 async function jobIsCurrent(job: WorkerJob): Promise<boolean> {
-  return await pointerMatches(job.sessionId, pointerNameForJob(job), job.token);
+  // Persisted state can outlive the version that created it.
+  return isWorkerKind(job.kind) && await pointerMatches(job.sessionId, pointerNameForJob(job), job.token);
 }
 
 export async function jobIsCurrentForTest(job: WorkerJob): Promise<boolean> {
@@ -642,18 +607,6 @@ async function writeDeliveryPayload(
   return path;
 }
 
-function userPresenceSummary(): SummaryResult {
-  return {
-    event: "user-presence",
-    text: USER_PRESENCE_SPEECH,
-    actionRequired: true,
-  };
-}
-
-export function userPresenceSummaryForTest(): SummaryResult {
-  return userPresenceSummary();
-}
-
 async function workerMain(path: string): Promise<number> {
   try {
     const [job, config] = await Promise.all([
@@ -661,7 +614,7 @@ async function workerMain(path: string): Promise<number> {
       loadConfig(),
     ]);
     if (!job) return 0;
-    if (!config.enabled) return job.kind === "user-presence" ? 1 : 0;
+    if (!config.enabled) return 0;
     const initialAge = Date.now() - job.createdAt;
     if (initialAge > MAX_IMPORTANT_AGE_MS || !(await jobIsCurrent(job))) {
       return 0;
@@ -674,14 +627,10 @@ async function workerMain(path: string): Promise<number> {
       }
     }
 
-    const context =
-      job.kind === "user-presence"
-        ? undefined
-        : await buildSummaryContext(job, config);
-    const summary =
-      job.kind === "user-presence"
-        ? userPresenceSummary()
-        : config.summary.enabled ? await runSummaryAgent(context!, config.summary.model || undefined, config.summary.instructions) : fallbackSummary(context!);
+    const context = await buildSummaryContext(job, config);
+    const summary = config.summary.enabled
+      ? await runSummaryAgent(context, config.summary.model || undefined, config.summary.instructions)
+      : fallbackSummary(context);
     if (summary.text === null) {
       await logEvent("info", "summary_silent");
       return 0;
@@ -691,7 +640,7 @@ async function workerMain(path: string): Promise<number> {
     }
     if (
       summary.event === "idle" &&
-      context?.state.durationMs !== undefined &&
+      context.state.durationMs !== undefined &&
       shouldIgnoreShortIdle(context.state.durationMs, config.notifyPolicy.ignoreShortTasksSeconds)
     ) {
       return 0;
@@ -713,10 +662,7 @@ async function workerMain(path: string): Promise<number> {
     const payloadPath = await writeDeliveryPayload(job, summary);
     try {
       if (await jobIsCurrent(job)) {
-        const delivered = (await deliverMain(payloadPath)) === 0;
-        if (job.kind === "user-presence" && !delivered) {
-          return 1;
-        }
+        await deliverMain(payloadPath);
       }
     } finally {
       await unlink(payloadPath).catch(() => {});
@@ -768,26 +714,10 @@ async function claimDelivery(
   }
 }
 
-async function releaseFailedDeliveryClaim(
-  payload: DeliveryPayload,
-  backend: DeliveryBackend,
-): Promise<void> {
-  if (payload.kind === "user-presence") {
-    await unlink(deliveryClaimPath(payload, backend)).catch(() => {});
-  }
-}
-
-export async function exerciseFailedDeliveryClaimForTest(
-  payload: DeliveryPayload,
-  backend: DeliveryBackend,
-): Promise<{ firstClaimed: boolean; retryClaimed: boolean }> {
-  const firstClaimed = await claimDelivery(payload, backend);
-  await releaseFailedDeliveryClaim(payload, backend);
-  const retryClaimed = await claimDelivery(payload, backend);
-  return { firstClaimed, retryClaimed };
-}
-
 async function deliveryIsCurrent(payload: DeliveryPayload): Promise<boolean> {
+  if (!isWorkerKind(payload.kind) || !["idle", "permission", "question", "error"].includes(payload.event)) {
+    return false;
+  }
   const name = payload.kind === "stop" ? "root" : payload.kind;
   return await pointerMatches(payload.sessionId, name, payload.token);
 }
@@ -899,16 +829,12 @@ async function deliverMain(path: string): Promise<number> {
   ) {
     return 0;
   }
-  if (!config.enabled) return payload.kind === "user-presence" ? 1 : 0;
-  let fishHandled = false;
+  if (!config.enabled) return 0;
   for (const backend of config.deliveryBackends) {
     if (!(await deliveryIsCurrent(payload))) {
       break;
     }
     if (!(await claimDelivery(payload, backend))) {
-      if (backend === "fishaudio") {
-        fishHandled = true;
-      }
       continue;
     }
     try {
@@ -920,10 +846,8 @@ async function deliverMain(path: string): Promise<number> {
       }, 100);
       try {
         const secrets = await resolveDeliverySecrets(config, backend, controller.signal);
-        const presentation = payload.event === "user-presence"
-          ? { title: "Codex · 硬件密钥", barkLevel: "timeSensitive" as const }
-          : eventPresentation(payload.event, config.summaryLanguage, "Codex");
-        const notice = { type: payload.event === "user-presence" ? "permission" as const : payload.event,
+        const presentation = eventPresentation(payload.event, config.summaryLanguage, "Codex");
+        const notice = { type: payload.event,
           summary: payload.text, ...presentation };
         const sendFish = createFishAudioSender(process.platform === "darwin" ? async audioPath => {
           if (!(await deliveryIsCurrent(payload)) || controller.signal.aborted) throw new Error("cancelled");
@@ -934,14 +858,12 @@ async function deliverMain(path: string): Promise<number> {
           : await sendBark(notice, config, secrets, controller.signal);
         if (controller.signal.aborted) continue;
         if (!result.ok) throw new Error(result.error ? formatDeliveryFailure(backend, result.error) : "delivery failed");
-        if (backend === "fishaudio") fishHandled = true;
       } finally { clearInterval(checkCurrent); }
     } catch (error) {
-      await releaseFailedDeliveryClaim(payload, backend);
       await logEvent("error", `${backend}_delivery_failed`, error);
     }
   }
-  return payload.kind === "user-presence" && !fishHandled ? 1 : 0;
+  return 0;
 }
 
 async function checkFish(): Promise<number> {
@@ -1060,22 +982,11 @@ async function hookMain(): Promise<number> {
   return 0;
 }
 
-async function signalMain(signal: SignalName): Promise<number> {
-  const job = buildUserPresenceJob();
-  await writePointer(job.sessionId, signal, job.token);
-  const path = await writeJob(job);
-  const result = await workerMain(path);
-  if (result !== 0) {
-    console.error(USER_PRESENCE_FAILURE_MESSAGE);
-  }
-  return result;
-}
-
 export async function main(argv = process.argv.slice(2)): Promise<number> {
   const mode = argv[0];
   if (mode === "--help") {
     console.log(
-      "Codex Brief: --check | --check-summary | --test | --signal user-presence | --paths",
+      "Codex Brief: --check | --check-summary | --test | --paths",
     );
     return 0;
   }
@@ -1093,13 +1004,6 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       ),
     );
     return 0;
-  }
-  if (mode === "--signal") {
-    if (argv.length !== 2 || argv[1] !== "user-presence") {
-      console.error("Usage: codex_brief.mts --signal user-presence");
-      return 2;
-    }
-    return await signalMain(argv[1]);
   }
   if (mode === "--worker" && argv[1]) {
     return await workerMain(resolve(argv[1]));

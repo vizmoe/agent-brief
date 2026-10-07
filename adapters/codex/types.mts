@@ -1,7 +1,6 @@
 export type NotificationEvent =
-  "idle" | "permission" | "question" | "error" | "user-presence";
-export type WorkerKind = "stop" | "permission" | "question" | "user-presence";
-export type SignalName = "user-presence";
+  "idle" | "permission" | "question" | "error";
+export type WorkerKind = "stop" | "permission" | "question";
 export type DeliveryBackend = "fishaudio" | "bark";
 
 export interface HookEvent {
