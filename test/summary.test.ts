@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_CONFIG } from "../config.ts";
-import type { HostModelRegistry } from "../host.ts";
-import { evidenceAwareFallback, normalizeSummaryOutput, runSummaryAgent, SUMMARY_SYSTEM_PROMPT } from "../summary.ts";
-import type { SummaryContext } from "../types.ts";
+import { DEFAULT_CONFIG } from "../adapters/pi/config.ts";
+import type { HostModelRegistry } from "../adapters/pi/host.ts";
+import { evidenceAwareFallback, normalizeSummaryOutput, runSummaryAgent, SUMMARY_SYSTEM_PROMPT } from "../adapters/pi/summary.ts";
+import type { SummaryContext } from "../core/types.ts";
 
 const evidence: SummaryContext = {
 	language: "zh-CN", event: "idle", session: { id: "root", rootOnly: true },

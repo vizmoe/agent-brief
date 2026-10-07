@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "event": {
+      "type": "string",
+      "enum": ["idle", "permission", "question", "error"]
+    },
+    "text": { "type": ["string", "null"], "minLength": 1, "maxLength": 600 },
+    "actionRequired": { "type": "boolean" }
+  },
+  "required": ["event", "text", "actionRequired"]
+}

@@ -1,29 +1,34 @@
 {
-  "name": "pi-brief",
-  "version": "0.3.0",
+  "name": "agent-brief",
+  "version": "0.4.0",
   "private": true,
   "license": "MIT",
-  "description": "Lightweight root-agent lifecycle notifications for Pi using Fish Audio and Bark.",
+  "description": "Native Codex and Pi voice and push notifications with a shared core.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vizmoe/pi-brief.git"
+    "url": "https://github.com/vizmoe/agent-brief.git"
   },
-  "homepage": "https://github.com/vizmoe/pi-brief#readme",
+  "homepage": "https://github.com/vizmoe/agent-brief#readme",
   "bugs": {
-    "url": "https://github.com/vizmoe/pi-brief/issues"
+    "url": "https://github.com/vizmoe/agent-brief/issues"
   },
   "type": "module",
   "scripts": {
-    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "test": "node --experimental-strip-types --test test/*.test.ts test/codex/*.test.mts",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test",
-    "audit": "node --experimental-strip-types scripts/audit.ts"
+    "check": "npm run check:version && npm run typecheck && npm test",
+    "audit": "node --experimental-strip-types scripts/audit.ts",
+    "check:version": "node --experimental-strip-types scripts/sync-version.ts --check",
+    "version": "node --experimental-strip-types scripts/sync-version.ts && git add .codex-plugin/plugin.json",
+    "prepack": "npm run check:version"
   },
   "keywords": [
     "pi-package",
     "pi-extension",
     "fish-audio",
-    "bark"
+    "bark",
+    "codex-plugin",
+    "agent-brief"
   ],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
@@ -34,21 +39,42 @@
     ]
   },
   "files": [
-    "index.ts",
-    "backends.ts",
-    "config.ts",
-    "detection.ts",
-    "diagnostics.ts",
-    "host.ts",
-    "policy.ts",
-    "runtime.ts",
-    "secrets.ts",
-    "summary.ts",
-    "types.ts",
-    "util.ts",
-    "config.example.json",
+    ".agents/plugins/marketplace.json",
+    ".codex-plugin/plugin.json",
+    "LICENSE",
     "README.md",
-    "LICENSE"
+    "adapters/codex/config.mts",
+    "adapters/codex/credentials.mts",
+    "adapters/codex/evidence.mts",
+    "adapters/codex/prompts/summary.schema.json",
+    "adapters/codex/prompts/summary.txt",
+    "adapters/codex/runtime.mts",
+    "adapters/codex/shared.mts",
+    "adapters/codex/summary.mts",
+    "adapters/codex/types.mts",
+    "adapters/pi/config.ts",
+    "adapters/pi/detection.ts",
+    "adapters/pi/diagnostics.ts",
+    "adapters/pi/host.ts",
+    "adapters/pi/index.ts",
+    "adapters/pi/runtime.ts",
+    "adapters/pi/summary.ts",
+    "config.example.json",
+    "core/backends.ts",
+    "core/command.ts",
+    "core/config.ts",
+    "core/diagnostics.ts",
+    "core/policy.ts",
+    "core/secrets.ts",
+    "core/summary.ts",
+    "core/types.ts",
+    "core/util.ts",
+    "docs/codex.md",
+    "docs/pi.md",
+    "hooks/hooks.json",
+    "index.ts",
+    "scripts/codex-brief.mts",
+    "skills/codex-brief/SKILL.md"
   ],
   "engines": {
     "node": ">=22.19.0"
@@ -57,5 +83,10 @@
     "@earendil-works/pi-coding-agent": "0.99.1",
     "@types/node": "24.12.4",
     "typescript": "5.9.3"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    }
   }
 }

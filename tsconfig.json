@@ -21,7 +21,13 @@
   },
   "include": [
     "*.ts",
-    "test/**/*.ts"
+    "core/**/*.ts",
+    "adapters/**/*.ts",
+    "adapters/**/*.mts",
+    "scripts/**/*.ts",
+    "scripts/**/*.mts",
+    "test/**/*.ts",
+    "test/**/*.mts"
   ],
   "exclude": [
     "node_modules"

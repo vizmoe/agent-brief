@@ -1,7 +1,6 @@
+import { IDLE_DELAY_MS, MIN_TASK_SECONDS, PLAYBACK_TIMEOUT_MS } from "./policy.ts";
 import { existsSync, readFileSync } from "node:fs";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -12,30 +11,6 @@ import {
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 const warned = new Set<string>();
-
-function expandHomePath(value: string): string {
-	if (value === "~") return homedir();
-	if (value.startsWith("~/") || value.startsWith("~\\")) {
-		return join(homedir(), value.slice(2));
-	}
-	return value;
-}
-
-export function resolveAgentDirectory(
-	env: NodeJS.ProcessEnv = process.env,
-): string {
-	const configured = env.PI_CODING_AGENT_DIR?.trim();
-	return configured ? expandHomePath(configured) : getAgentDir();
-}
-
-export function resolveConfigPath(
-	env: NodeJS.ProcessEnv = process.env,
-): string {
-	const explicit = env.PI_BRIEF_CONFIG?.trim();
-	if (explicit) return expandHomePath(explicit);
-
-	return join(resolveAgentDirectory(env), "pi-brief", "config.json");
-}
 
 export const EVENT_PRESENTATION: Record<
 	NotificationType,
@@ -64,13 +39,14 @@ const EN_FALLBACK_MESSAGES: Record<NotificationType, string> = {
 export function eventPresentation(
 	type: NotificationType,
 	language: string,
+	agent = "Pi",
 ): { title: string; barkLevel: BarkLevel } {
 	const presentation = EVENT_PRESENTATION[type];
 	return {
 		...presentation,
-		title: /^en(?:-|$)/i.test(language)
+		title: (/^en(?:-|$)/i.test(language)
 			? EN_EVENT_TITLES[type]
-			: presentation.title,
+			: presentation.title).replace(/^Pi/, agent),
 	};
 }
 
@@ -95,8 +71,8 @@ export const DEFAULT_CONFIG: NotifyConfig = {
 	notifyRootOnly: true,
 	deliveryBackends: [],
 	notifyPolicy: {
-		idleDelayMs: 30_000,
-		ignoreShortTasksSeconds: 10,
+		idleDelayMs: IDLE_DELAY_MS,
+		ignoreShortTasksSeconds: MIN_TASK_SECONDS,
 		dedupeWindowMs: 1000,
 		quietHours: {
 			enabled: false,
@@ -125,7 +101,7 @@ export const DEFAULT_CONFIG: NotifyConfig = {
 			speed: 1,
 			player: "/usr/bin/afplay",
 			requestTimeoutMs: 20_000,
-			playbackTimeoutMs: 60_000,
+			playbackTimeoutMs: PLAYBACK_TIMEOUT_MS,
 			maxAudioBytes: 10 * 1024 * 1024,
 		},
 		bark: {
@@ -177,7 +153,7 @@ function timeValue(value: unknown, fallback: string): string {
 }
 
 /** Parse only the small public schema; internal tuning is deliberately not configurable. */
-export function parseConfig(value: unknown, configPath = resolveConfigPath()): NotifyConfig {
+export function parseConfig(value: unknown, configPath: string): NotifyConfig {
 	const config = structuredClone(DEFAULT_CONFIG);
 	config.configDirectory = dirname(resolve(configPath));
 	if (!isRecord(value)) {
@@ -194,8 +170,8 @@ export function parseConfig(value: unknown, configPath = resolveConfigPath()): N
 	config.summary.enabled = value.summary !== false;
 	config.summary.model = stringValue(summary.model, "");
 	config.summary.instructions = stringValue(summary.instructions, "").slice(0, 2000);
-	config.notifyPolicy.idleDelayMs = numberValue(notify.idleDelaySeconds, 30, 0, 600) * 1000;
-	config.notifyPolicy.ignoreShortTasksSeconds = numberValue(notify.minTaskSeconds, 10, 0, 3600);
+	config.notifyPolicy.idleDelayMs = numberValue(notify.idleDelaySeconds, IDLE_DELAY_MS / 1000, 0, 600) * 1000;
+	config.notifyPolicy.ignoreShortTasksSeconds = numberValue(notify.minTaskSeconds, MIN_TASK_SECONDS, 0, 3600);
 	if (Object.keys(quiet).length) {
 		config.notifyPolicy.quietHours.enabled = true;
 		config.notifyPolicy.quietHours.start = timeValue(quiet.start, "23:00");
@@ -220,10 +196,10 @@ export function parseConfig(value: unknown, configPath = resolveConfigPath()): N
 function warnOnce(key: string, message: string): void {
 	if (warned.has(key)) return;
 	warned.add(key);
-	console.warn(`[pi-brief] ${message}`);
+	console.warn(`[agent-brief] ${message}`);
 }
 
-export function loadConfig(configPath = resolveConfigPath()): NotifyConfig {
+export function loadConfig(configPath: string): NotifyConfig {
 	try {
 		if (existsSync(configPath)) return parseConfig(JSON.parse(readFileSync(configPath, "utf8")), configPath);
 	} catch {

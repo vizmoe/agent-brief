@@ -3,8 +3,8 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import test from "node:test";
-import { parseConfig } from "../config.ts";
-import { createRuntimeSecretsSource, createSecretResolver } from "../secrets.ts";
+import { parseConfig } from "../adapters/pi/config.ts";
+import { createRuntimeSecretsSource, createSecretResolver } from "../core/secrets.ts";
 
 test("whole-value commands support nested braces, pipes, literals, and explicit env references", async () => {
 	const run = promisify(execFile);

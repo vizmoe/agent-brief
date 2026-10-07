@@ -1,0 +1,20 @@
+{
+  "name": "agent-brief",
+  "version": "0.4.0",
+  "description": "Native Codex and Pi voice and push notifications with a shared core.",
+  "author": {
+    "name": "shiro"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Agent Brief",
+    "shortDescription": "Native voice and push notifications for Codex and Pi.",
+    "longDescription": "Shared notification core with Codex lifecycle hooks and a Pi extension. Fish Audio speech, Bark push, and private command-based credentials.",
+    "developerName": "shiro",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": [
+      "检查 Codex Brief 的配置和语音提醒。"
+    ]
+  }
+}

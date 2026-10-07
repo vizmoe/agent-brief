@@ -1,15 +1,23 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { parseBarkDeviceKeys } from "./backends.ts";
 import { describeError } from "./diagnostics.ts";
 import type { DeliveryFailure, NotifyConfig, RuntimeSecrets } from "./types.ts";
 import { withTimeout } from "./util.ts";
 
-type Exec = ExtensionAPI["exec"];
+export type CredentialExec = (
+	command: string, args: string[], options: { cwd: string; timeout: number; signal?: AbortSignal },
+) => Promise<{ code: number; stdout: string; stderr: string; killed: boolean }>;
 const COMMAND_TIMEOUT_MS = 10_000;
 const MAX_SECRET_BYTES = 64 * 1024;
 interface SecretResolution {
 	value: string | null;
 	error?: Pick<DeliveryFailure, "code" | "message">;
+}
+export interface CredentialOptions {
+	timeoutMs?: number;
+	maxBytes?: number;
+	singleLine?: boolean;
+	sequential?: boolean;
+	cwd?: string;
 }
 
 function failed(code: string, message: string): SecretResolution {
@@ -17,7 +25,11 @@ function failed(code: string, message: string): SecretResolution {
 }
 
 /** Successful values and concurrent lookups share one cache per session. */
-export function createSecretResolver(exec: Exec, cwd: string, env: NodeJS.ProcessEnv = process.env) {
+export function createSecretResolver(exec: CredentialExec, cwd: string, env: NodeJS.ProcessEnv = process.env,
+	options: CredentialOptions = {},
+) {
+	const timeoutMs = options.timeoutMs ?? COMMAND_TIMEOUT_MS;
+	const maxBytes = options.maxBytes ?? MAX_SECRET_BYTES;
 	const cache = new Map<string, Promise<SecretResolution>>();
 	return function resolve(value: string, signal?: AbortSignal): Promise<SecretResolution> {
 		if (signal?.aborted) return Promise.resolve({ value: null });
@@ -33,10 +45,10 @@ export function createSecretResolver(exec: Exec, cwd: string, env: NodeJS.Proces
 					}
 					const shell = env.SHELL || "/bin/sh";
 					const output = await withTimeout((commandSignal) => exec(shell, ["-c", source.slice(2, -1)], {
-						cwd, timeout: COMMAND_TIMEOUT_MS, signal: commandSignal,
-					}), COMMAND_TIMEOUT_MS, signal);
+						cwd, timeout: timeoutMs, signal: commandSignal,
+					}), timeoutMs, signal);
 					if (signal?.aborted) return { value: null };
-					if (output.killed) return failed("killed", "命令超时或被终止（上限 10 秒）");
+					if (output.killed) return failed("killed", `命令超时或被终止（上限 ${timeoutMs / 1000} 秒）`);
 					if (output.code !== 0) {
 						const cause = describeError(output.stderr);
 						return failed(`exit-${output.code}-${cause.code}`, `命令退出码 ${output.code}；${cause.message}`);
@@ -52,12 +64,13 @@ export function createSecretResolver(exec: Exec, cwd: string, env: NodeJS.Proces
 				const trimmed = result?.trim();
 				if (!trimmed) return failed("empty", source.startsWith("!{") ? "命令输出为空" : "配置值为空");
 				if (trimmed.includes("\0")) return failed("nul", "取值包含无效的 NUL 字符");
-				if (Buffer.byteLength(trimmed) > MAX_SECRET_BYTES) return failed("size", "取值超过 64 KiB 上限");
+				if (options.singleLine && /[\r\n]/.test(trimmed)) return failed("lines", "取值必须是单行");
+				if (Buffer.byteLength(trimmed) > maxBytes) return failed("size", `取值超过 ${maxBytes / 1024} KiB 上限`);
 				return { value: trimmed };
 			} catch (error) {
 				if (signal?.aborted) return { value: null };
 				const cause = describeError(error);
-				return failed(cause.code, cause.code === "timeout" ? "命令读取超时（上限 10 秒）" : cause.message);
+				return failed(cause.code, cause.code === "timeout" ? `命令读取超时（上限 ${timeoutMs / 1000} 秒）` : cause.message);
 			}
 		})();
 		cache.set(source, pending);
@@ -69,13 +82,13 @@ export function createSecretResolver(exec: Exec, cwd: string, env: NodeJS.Proces
 }
 
 /** Called lazily; disabled backends never execute their credential commands. */
-export function createRuntimeSecretsSource(config: NotifyConfig, exec: Exec) {
+export function createRuntimeSecretsSource(config: NotifyConfig, exec: CredentialExec, options: CredentialOptions = {}) {
 	let sessionSignal: AbortSignal | undefined;
-	let resolve = createSecretResolver(exec, config.configDirectory);
+	let resolve = createSecretResolver(exec, options.cwd ?? config.configDirectory, process.env, options);
 	return async (signal?: AbortSignal): Promise<RuntimeSecrets> => {
 		if (signal !== sessionSignal) {
 			sessionSignal = signal;
-			resolve = createSecretResolver(exec, config.configDirectory);
+			resolve = createSecretResolver(exec, options.cwd ?? config.configDirectory, process.env, options);
 		}
 		const fish = config.backends.fishAudio;
 		const bark = config.backends.bark;
@@ -83,11 +96,17 @@ export function createRuntimeSecretsSource(config: NotifyConfig, exec: Exec) {
 		const barkEnabled = config.deliveryBackends.includes("bark");
 		const get = (enabled: boolean, value: string): Promise<SecretResolution> => enabled
 			? resolve(value, signal) : Promise.resolve({ value: null });
-		const [apiKey, referenceId, model, serverUrl, deviceKeys] = await Promise.all([
-			get(fishEnabled, fish.apiKey), get(fishEnabled, fish.referenceId), get(fishEnabled, fish.model),
-			get(barkEnabled, bark.serverUrl),
-			Promise.all((Array.isArray(bark.deviceKeys) ? bark.deviceKeys : [bark.deviceKeys])
-				.map((value) => get(barkEnabled, value))),
+		const channel = async (enabled: boolean, values: string[]): Promise<SecretResolution[]> => {
+			if (!options.sequential) return Promise.all(values.map(value => get(enabled, value)));
+			const results: SecretResolution[] = [];
+			for (const value of values) {
+				results.push(results.some(result => result.value === null) ? { value: null } : await get(enabled, value));
+			}
+			return results;
+		};
+		const [[apiKey, referenceId, model], [serverUrl, ...deviceKeys]] = await Promise.all([
+			channel(fishEnabled, [fish.apiKey, fish.referenceId, fish.model]),
+			channel(barkEnabled, [bark.serverUrl, ...(Array.isArray(bark.deviceKeys) ? bark.deviceKeys : [bark.deviceKeys])]),
 		]);
 		const failures: NonNullable<RuntimeSecrets["failures"]> = {};
 		const collect = (fields: Array<[string, SecretResolution]>): DeliveryFailure | undefined => {
