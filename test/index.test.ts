@@ -12,7 +12,7 @@ import {
 	fishAudioTextForPiAgent,
 	isSuccessfulBarkResponse,
 	parseBarkDeviceKeys,
-} from "../backends.ts";
+} from "../core/backends.ts";
 import {
 	DEFAULT_CONFIG,
 	eventPresentation,
@@ -20,9 +20,9 @@ import {
 	notificationFallback,
 	resolveAgentDirectory,
 	resolveConfigPath,
-} from "../config.ts";
+} from "../adapters/pi/config.ts";
 import agentNotifyExtension from "../index.ts";
-import { installAgentNotify } from "../runtime.ts";
+import { installAgentNotify } from "../adapters/pi/runtime.ts";
 import {
 	isBlockingQuestionText,
 	isInternalWorkerProcess,
@@ -30,12 +30,12 @@ import {
 	readPermissionUiPromptEvent,
 	shouldDispatchNotification,
 	summarizePermissionAction,
-} from "../detection.ts";
+} from "../adapters/pi/detection.ts";
 import {
 	isNotificationAllowedNow,
 	isQuietHours,
 	shouldIgnoreShortIdle,
-} from "../policy.ts";
+} from "../core/policy.ts";
 import {
 	buildSummaryPrompt,
 	evidenceAwareFallback,
@@ -45,15 +45,15 @@ import {
 	sessionModelRef,
 	SUMMARY_SYSTEM_PROMPT,
 	summaryConfigForSession,
-} from "../summary.ts";
-import type { HostContext } from "../host.ts";
-import { createRuntimeSecretsSource } from "../secrets.ts";
+} from "../adapters/pi/summary.ts";
+import type { HostContext } from "../adapters/pi/host.ts";
+import { createRuntimeSecretsSource } from "../core/secrets.ts";
 import type {
 	DeliveryResult,
 	NotifyConfig,
 	RuntimeSecrets,
 	SummaryContext,
-} from "../types.ts";
+} from "../core/types.ts";
 
 const TEST_SECRETS: RuntimeSecrets = {
 	fishAudio: {

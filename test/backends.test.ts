@@ -3,9 +3,9 @@ import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { consumeFetchWithTimeout, createFishAudioSender, sendBark, sendFishAudio as sendNativeFishAudio } from "../backends.ts";
-import { parseConfig } from "../config.ts";
-import type { DeliveryResult, NotificationPayload, RuntimeSecrets } from "../types.ts";
+import { consumeFetchWithTimeout, createFishAudioSender, sendBark, sendFishAudio as sendNativeFishAudio } from "../core/backends.ts";
+import { parseConfig } from "../adapters/pi/config.ts";
+import type { DeliveryResult, NotificationPayload, RuntimeSecrets } from "../core/types.ts";
 
 const config = () => parseConfig({ fishAudio: { apiKey: "key", referenceId: "voice" } });
 const secrets: RuntimeSecrets = {

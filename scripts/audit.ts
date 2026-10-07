@@ -9,7 +9,7 @@ export interface AuditHost {
 	developmentOnly: boolean;
 }
 
-// https://github.com/vizmoe/pi-brief/issues/3: remove when the upstream host is fixed.
+// https://github.com/vizmoe/agent-brief/issues/3: remove when the upstream host is fixed.
 const approvedAdvisories = new Set([
 	"https://github.com/advisories/GHSA-qhr7-859c-m2p7",
 	"https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
@@ -57,7 +57,7 @@ function runAudit() {
 		developmentOnly: manifest.devDependencies?.[hostName] === version
 			&& !manifest.dependencies?.[hostName] && !manifest.optionalDependencies?.[hostName],
 	});
-	if (decision === "upstream") console.warn("Accepted the known Pi 0.99.1 development-host advisories tracked in https://github.com/vizmoe/pi-brief/issues/3.");
+	if (decision === "upstream") console.warn("Accepted the known Pi 0.99.1 development-host advisories tracked in https://github.com/vizmoe/agent-brief/issues/3.");
 	process.exitCode = decision === "failed" ? 1 : 0;
 }
 

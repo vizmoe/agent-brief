@@ -1,9 +1,7 @@
-import type { HostContext } from "./host.ts";
 import { sanitizeEvidenceText } from "./summary.ts";
-import type { DeliveryBackend, DeliveryFailure, DeliveryResult } from "./types.ts";
+import type { DeliveryBackend, DeliveryFailure } from "./types.ts";
 import { isRecord } from "./util.ts";
 
-type LocalUI = Pick<HostContext, "hasUI" | "ui">;
 type FailureDetail = Pick<DeliveryFailure, "code" | "message">;
 
 /** Only constructed with fixed text or validated numbers, never an external message. */
@@ -91,33 +89,4 @@ const STAGE_NAMES: Record<DeliveryFailure["stage"], string> = {
 
 export function formatDeliveryFailure(backend: DeliveryBackend, failure: DeliveryFailure): string {
 	return `${BACKEND_NAMES[backend]} ${STAGE_NAMES[failure.stage]}：${failure.message}`;
-}
-
-/** Pi notify is fire-and-forget in TUI/RPC. Headless output belongs on stderr. */
-export function notifyLocal(ctx: LocalUI | undefined, message: string, level: "info" | "warning" = "warning"): void {
-	const text = `[pi-brief] ${message}`;
-	try {
-		if (ctx?.hasUI) {
-			ctx.ui.notify(text, level);
-			return;
-		}
-	} catch { /* A broken UI must not escape into the agent or hide the diagnostic. */ }
-	try { console.warn(text); } catch { /* Reporting is also failure-open. */ }
-}
-
-/** One reporter per session; repeated failures stay quiet until that backend succeeds. */
-export function createDeliveryReporter(ctx?: LocalUI) {
-	const seen = new Set<string>();
-	return (backend: DeliveryBackend, result: DeliveryResult, showFailure = true): void => {
-		if (result.ok) {
-			for (const key of seen) if (key.startsWith(`${backend}:`)) seen.delete(key);
-			return;
-		}
-		if (!result.error || !showFailure) return;
-		const key = `${backend}:${result.error.stage}:${result.error.code}`;
-		if (seen.has(key)) return;
-		if (seen.size >= 128) seen.delete(seen.values().next().value!);
-		seen.add(key);
-		notifyLocal(ctx, formatDeliveryFailure(backend, result.error));
-	};
 }

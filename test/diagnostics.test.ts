@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createDeliveryReporter, notifyLocal } from "../diagnostics.ts";
-import type { HostContext } from "../host.ts";
-import type { DeliveryResult } from "../types.ts";
+import { createDeliveryReporter, notifyLocal } from "../adapters/pi/diagnostics.ts";
+import type { HostContext } from "../adapters/pi/host.ts";
+import type { DeliveryResult } from "../core/types.ts";
 
 const unavailable: DeliveryResult = {
 	ok: false, error: { stage: "request", code: "http-503", message: "HTTP 503；服务暂时不可用。" },

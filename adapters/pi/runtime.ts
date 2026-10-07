@@ -1,7 +1,7 @@
 import {
 	sendBark,
 	sendFishAudio,
-} from "./backends.ts";
+} from "../../core/backends.ts";
 import {
 	eventPresentation,
 	notificationFallback,
@@ -33,7 +33,7 @@ import { createDeliveryReporter, describeError, formatDeliveryFailure, notifyLoc
 import {
 	isNotificationAllowedNow,
 	shouldIgnoreShortIdle,
-} from "./policy.ts";
+} from "../../core/policy.ts";
 import {
 	evidenceAwareFallback,
 	runSummaryAgent,
@@ -52,7 +52,7 @@ import {
 	type NotifyConfig,
 	type RuntimeSecrets,
 	type SummaryContext,
-} from "./types.ts";
+} from "../../core/types.ts";
 
 type DeliveryResults = Partial<Record<DeliveryBackend, DeliveryResult>>;
 // Event-only integrations must not leave a stale permission scope forever.

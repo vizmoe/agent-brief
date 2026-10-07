@@ -391,7 +391,7 @@ export function createFishAudioSender(
 			if (httpError) return { ok: false, error: httpError };
 			if (!audio || audio.byteLength === 0) return failure("response", "empty", "返回的音频为空。");
 			stage = "storage";
-			temporaryDirectory = await mkdtemp(join(tmpdir(), "pi-brief-"));
+			temporaryDirectory = await mkdtemp(join(tmpdir(), "agent-brief-"));
 			const filePath = join(
 				temporaryDirectory,
 				`notification.${config.backends.fishAudio.format}`,

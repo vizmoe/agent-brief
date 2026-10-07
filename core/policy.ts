@@ -1,3 +1,7 @@
+export const IDLE_DELAY_MS = 30_000;
+export const MIN_TASK_SECONDS = 10;
+export const PLAYBACK_TIMEOUT_MS = 60_000;
+
 import type {
 	NotificationType,
 	QuietHoursConfig,

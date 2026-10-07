@@ -4,8 +4,8 @@ import { sanitizeEvidenceText } from "./summary.ts";
 import type {
 	AssistantOutcome,
 	NotificationType,
-} from "./types.ts";
-import { isRecord } from "./util.ts";
+} from "../../core/types.ts";
+import { isRecord } from "../../core/util.ts";
 
 export interface PermissionUiPromptEvent {
 	requestId: string;
