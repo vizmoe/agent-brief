@@ -72,6 +72,11 @@ test("packaged Codex hooks run detached delivery, cancel stale work and share sa
       child.stdin.end(JSON.stringify({ session_id: "packaged", turn_id: "turn", hook_event_name: name, ...extra }));
     });
     await hook("SessionStart");
+    await assert.rejects(access(join(env.CODEX_HOME, "codex-brief/runtime.json")));
+    const sessions = await readdir(join(state, "sessions"));
+    assert.equal(sessions.length, 1);
+    assert.deepEqual((await readdir(join(state, "sessions", sessions[0]))).sort(),
+      ["permission.pointer.json", "question.pointer.json", "root.pointer.json"]);
     await hook("UserPromptSubmit", { prompt: "Deploy the update" });
     const question = { tool_name: "request_user_input", tool_input: { questions: [{ question: "Choose staging or production." }] } };
     await hook("PreToolUse", { ...question, tool_use_id: "first" });
@@ -111,6 +116,20 @@ process.stdin.on("end", () => fs.writeFileSync(args[args.indexOf("--output-last-
     await hook("Stop", { last_assistant_message: "Deployment checks passed." });
     await until(async () => requests.length === 3 && await jobsFinished());
     assert.equal(requests[2].body, "Codex completed the deployment checks.");
+
+    // A failed ordinary delivery remains claimed; replay must not notify twice.
+    responseCode = 503;
+    const pointer = JSON.parse(await readFile(join(state, "sessions", sessions[0], "root.pointer.json"), "utf8"));
+    const replay = join(directory, "replay.json");
+    await writeFile(replay, JSON.stringify({ kind: "stop", event: "error", text: "Codex needs attention.",
+      sessionId: "packaged", turnId: "turn", eventId: "replayed-error", token: pointer.token, createdAt: Date.now() }));
+    const deliver = () => exec(process.execPath, [join(packed, "scripts/codex-brief.mts"), "--deliver", replay], { cwd: directory, env });
+    await deliver();
+    assert.equal(requests.length, 4);
+    assert.equal(requests[3].title, "Codex · Error");
+    assert.equal(requests[3].body, "Codex needs attention.");
+    await deliver();
+    assert.equal(requests.length, 4, "failed delivery stays deduplicated on replay");
     await hook("SessionEnd");
   } finally {
     await until(jobsFinished).catch(() => {});

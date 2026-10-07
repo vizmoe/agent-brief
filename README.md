@@ -57,7 +57,7 @@ Set `AGENT_BRIEF_CONFIG` to share one file across both hosts; it takes precedenc
 The repository was renamed from `vizmoe/pi-brief`; the maintained Codex plugin was imported from the local `tts/codex-brief` source. Git history for Pi is preserved. No media, personal settings, credentials, or older Doubao tools are included.
 
 - **Pi:** remove the old Git installation with `pi remove git:github.com/vizmoe/pi-brief`, then install the new URL and run `/reload`. For an automatically discovered local checkout, update that checkout instead of installing a second copy. The existing configuration and `/pi-brief-test` command still work.
-- **Codex:** disable the old `codex-brief@personal` plugin, install Agent Brief, trust its hooks, and open a new chat. Keep the old configuration: `fishAudio.voiceId`, `bark.deviceKey`, and top-level `quietHours` are normalized by the Codex adapter. New installations can use the shared schema above. Existing `--check`, `--check-summary`, `--test`, `--paths`, and `--signal user-presence` commands remain at `scripts/codex-brief.mts`.
+- **Codex:** disable the old `codex-brief@personal` plugin, install Agent Brief, trust its hooks, and open a new chat. Keep the old configuration: `fishAudio.voiceId`, `bark.deviceKey`, and top-level `quietHours` are normalized by the Codex adapter. New installations can use the shared schema above. Existing `--check`, `--check-summary`, `--test`, and `--paths` commands remain at `scripts/codex-brief.mts`.
 
 Only one copy per host should be enabled to avoid duplicate notifications. Repository consolidation does not reinstall an active plugin or alter user hook trust. New changes belong in this repository; the old local Codex source is no longer the development entrypoint.
 
