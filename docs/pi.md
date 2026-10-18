@@ -9,7 +9,7 @@ Short voice and push notifications for [Pi](https://pi.dev). Hear what changed, 
 
 ## Requirements
 
-- **Pi 0.99.1 or later** and **Node.js 22.19.0 or later**. The development host is pinned to Pi 0.99.1 to test the minimum supported version.
+- **Pi 0.99.1 or later** and **Node.js 22.19.0 or later**. The development host is pinned in [package.json](../package.json).
 - A Fish Audio API key and voice reference ID for speech, or a Bark server URL and device key for push notifications.
 - macOS with `afplay` for local speech playback. Bark and the portable transport tests also work on Linux.
 

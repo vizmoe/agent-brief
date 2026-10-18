@@ -810,6 +810,46 @@ test("fetch timeout remains active while streamed body is consumed", async (t) =
 	await rejection;
 });
 
+test("task evidence accepts legacy and current user starts without treating custom messages as user prompts", async (t) => {
+	for (const [name, event, task] of [
+		["legacy user", { prompt: "Implement feature" }, "Implement feature"],
+		["current user", { messageType: "user", prompt: "Implement feature" }, "Implement feature"],
+		["custom", { messageType: "custom", message: { role: "custom", content: "Internal trigger" } }, undefined],
+	] as const) {
+		await t.test(name, async (t) => {
+			t.mock.timers.enable({ apis: ["setTimeout"] });
+			const pi = fakePi();
+			const cfg = config();
+			cfg.deliveryBackends = ["bark"];
+			cfg.notifyPolicy.idleDelayMs = 1;
+			cfg.notifyPolicy.ignoreShortTasksSeconds = 0;
+			const summaries: SummaryContext[] = [];
+			installAgentNotify(pi.api as never, cfg, TEST_SECRETS, {
+				runSummary: async (summaryContext) => {
+					summaries.push(summaryContext);
+					return "Pi completed the feature.";
+				},
+				sendBark: async () => ({ ok: true }),
+			});
+			const ctx = context();
+			await pi.emit("session_start", {}, ctx);
+			await pi.emit("before_agent_start", event, ctx);
+			await pi.emit("agent_start", {}, ctx);
+			await pi.emit("message_end", {
+				message: { role: "assistant", stopReason: "stop", content: "Implemented feature and tests passed." },
+			}, ctx);
+			await pi.emit("agent_settled", {}, ctx);
+			t.mock.timers.tick(1);
+			await new Promise((resolve) => setImmediate(resolve));
+			assert.equal(summaries.length, 1);
+			assert.equal(summaries[0].state.currentTask, task);
+			assert.deepEqual(summaries[0].recentMessages?.filter((message) => message.role === "user"),
+				task ? [{ role: "user", text: task }] : []);
+			await pi.emit("session_shutdown", {}, ctx);
+		});
+	}
+});
+
 test("lifecycle waits for idle delay and reuses one summary for both backends", async () => {
 	const pi = fakePi();
 	const cfg = config();

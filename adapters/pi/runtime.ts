@@ -698,7 +698,7 @@ export function installAgentNotify(
 			state.taskStartedAt = deps.now();
 		}
 		state.outcome = "unknown";
-		const prompt = sanitizeEvidenceText(event.prompt, 800);
+		const prompt = sanitizeEvidenceText("prompt" in event ? event.prompt : undefined, 800);
 		if (prompt) {
 			state.currentTask = prompt;
 		}
